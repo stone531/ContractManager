@@ -1,12 +1,14 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using server.Models;
 
 namespace server.Data;
 
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    {
+    }
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Contract> Contracts => Set<Contract>();
@@ -14,18 +16,16 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // 配置 User Email 唯一索引
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
             .IsUnique();
 
-        // 配置 Contract �?Payment 的关�?        modelBuilder.Entity<Payment>()
+        modelBuilder.Entity<Payment>()
             .HasOne(p => p.Contract)
             .WithMany(c => c.Payments)
             .HasForeignKey(p => p.ContractId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // 配置 Decimal 精度
         modelBuilder.Entity<Contract>()
             .Property(c => c.TotalAmount)
             .HasPrecision(18, 2);
@@ -38,8 +38,8 @@ public class AppDbContext : DbContext
             .Property(p => p.Amount)
             .HasPrecision(18, 2);
 
-        // 种子数据 - 使用预生成的密码哈希
-        // 密码 "password123" 的哈希值（使用 PasswordHasher<User> 生成�?        var hasher = new PasswordHasher<User>();
+        // 使用预生成密码哈希写入测试种子数据
+        var hasher = new PasswordHasher<User>();
         var tempUser = new User();
         var passwordHash = hasher.HashPassword(tempUser, "password123");
 

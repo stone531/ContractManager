@@ -20,7 +20,6 @@ public class ContractsController : ControllerBase
         _environment = environment;
     }
 
-    // GET api/contracts
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -31,19 +30,17 @@ public class ContractsController : ControllerBase
         return Ok(contracts);
     }
 
-    // GET api/contracts/1
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
         var contract = await _db.Contracts
             .Include(c => c.Payments)
             .FirstOrDefaultAsync(c => c.Id == id);
-        
+
         if (contract is null) return NotFound();
         return Ok(contract);
     }
 
-    // POST api/contracts (with file upload)
     [HttpPost]
     public async Task<IActionResult> Create([FromForm] ContractCreateDto dto)
     {
@@ -52,10 +49,9 @@ public class ContractsController : ControllerBase
             Name = dto.Name,
             Description = dto.Description,
             TotalAmount = dto.TotalAmount,
-            OriginalAmount = dto.TotalAmount  // 保存原始金额
+            OriginalAmount = dto.TotalAmount
         };
 
-        // 处理文件上传
         if (dto.File != null && dto.File.Length > 0)
         {
             var uploadsFolder = Path.Combine(_environment.ContentRootPath, "uploads", "contracts");
@@ -64,10 +60,8 @@ public class ContractsController : ControllerBase
             var uniqueFileName = $"{Guid.NewGuid()}_{dto.File.FileName}";
             var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await dto.File.CopyToAsync(stream);
-            }
+            await using var stream = new FileStream(filePath, FileMode.Create);
+            await dto.File.CopyToAsync(stream);
 
             contract.FileName = dto.File.FileName;
             contract.FilePath = Path.Combine("uploads", "contracts", uniqueFileName);
@@ -78,7 +72,6 @@ public class ContractsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = contract.Id }, contract);
     }
 
-    // PUT api/contracts/1
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] ContractUpdateDto dto)
     {
@@ -94,14 +87,12 @@ public class ContractsController : ControllerBase
         return Ok(contract);
     }
 
-    // DELETE api/contracts/1
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
         var contract = await _db.Contracts.FindAsync(id);
         if (contract is null) return NotFound();
 
-        // 删除关联文件
         if (!string.IsNullOrEmpty(contract.FilePath))
         {
             var filePath = Path.Combine(_environment.ContentRootPath, contract.FilePath);
@@ -116,7 +107,6 @@ public class ContractsController : ControllerBase
         return NoContent();
     }
 
-    // GET api/contracts/1/download
     [HttpGet("{id}/download")]
     public async Task<IActionResult> DownloadFile(int id)
     {
@@ -124,34 +114,31 @@ public class ContractsController : ControllerBase
         if (contract is null) return NotFound();
 
         if (string.IsNullOrEmpty(contract.FilePath))
-            return NotFound("合同文件不存�?);
+            return NotFound("合同文件不存在");
 
         var filePath = Path.Combine(_environment.ContentRootPath, contract.FilePath);
         if (!System.IO.File.Exists(filePath))
-            return NotFound("文件不存�?);
+            return NotFound("文件不存在");
 
         var memory = new MemoryStream();
-        using (var stream = new FileStream(filePath, FileMode.Open))
+        await using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
         {
             await stream.CopyToAsync(memory);
         }
-        memory.Position = 0;
 
-        var contentType = "application/octet-stream";
-        return File(memory, contentType, contract.FileName);
+        memory.Position = 0;
+        return File(memory, "application/octet-stream", contract.FileName ?? "contract.bin");
     }
 
-    // POST api/contracts/1/payments
     [HttpPost("{id}/payments")]
     public async Task<IActionResult> AddPayment(int id, [FromBody] PaymentCreateDto dto)
     {
         var contract = await _db.Contracts
             .Include(c => c.Payments)
             .FirstOrDefaultAsync(c => c.Id == id);
-        
+
         if (contract is null) return NotFound();
 
-        // 检查是否超额支�?
         if (contract.PaidAmount + dto.Amount > contract.TotalAmount)
         {
             return BadRequest("支付金额超过合同总额");
@@ -173,7 +160,6 @@ public class ContractsController : ControllerBase
         return Ok(payment);
     }
 
-    // GET api/contracts/1/payments
     [HttpGet("{id}/payments")]
     public async Task<IActionResult> GetPayments(int id)
     {
@@ -181,12 +167,11 @@ public class ContractsController : ControllerBase
             .Where(p => p.ContractId == id)
             .OrderByDescending(p => p.PaymentDate)
             .ToListAsync();
-        
+
         return Ok(payments);
     }
 }
 
-// DTOs
 public class ContractCreateDto
 {
     public string Name { get; set; } = string.Empty;
