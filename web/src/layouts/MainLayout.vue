@@ -190,7 +190,7 @@ provide('refreshUnreadCount', fetchUnreadCount)
 // 每30秒刷新未读数
 onMounted(() => {
   fetchUnreadCount()
-  setInterval(fetchUnreadCount, 3600000)
+  setInterval(fetchUnreadCount, 60000)
 })
 
 // 菜单组展开状态

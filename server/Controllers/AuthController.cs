@@ -88,6 +88,11 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "用户名或密码错误" });
         }
 
+        if (!user.IsEnabled)
+        {
+            return Unauthorized(new { message = "账户已被禁用，请联系管理员" });
+        }
+
         var token = _tokenService.GenerateToken(user);
         var userDto = new UserDto(user.Id, user.Name, user.Email, user.Role, user.CreatedAt);
         var response = new AuthResponseDto(token, userDto);

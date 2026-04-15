@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace server.Models;
 
@@ -50,10 +51,12 @@ public class Contract
     // 已支付金�?
     public decimal PaidAmount { get; set; } = 0;
 
-    // 剩余金额（计算属性）
+    // 剩余金额（计算属性，不映射到数据库）
+    [NotMapped]
     public decimal RemainingAmount => TotalAmount - PaidAmount;
 
-    // 是否已完成支�?
+    // 是否已完成支付
+    [NotMapped]
     public bool IsFullyPaid => PaidAmount >= TotalAmount;
 
     // 创建时间

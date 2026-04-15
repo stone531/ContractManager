@@ -48,6 +48,7 @@
               <th>姓名</th>
               <th>邮箱</th>
               <th>角色</th>
+              <th>状态</th>
               <th>创建时间</th>
               <th>操作</th>
             </tr>
@@ -60,8 +61,13 @@
               </td>
               <td>{{ user.email }}</td>
               <td>
-                <span class="role-badge" :class="isUserAdmin(user) ? 'role-admin' : 'role-user'">
-                  {{ isUserAdmin(user) ? '超级管理员' : '普通用户' }}
+                <span class="role-badge" :class="getRoleClass(user.role)">
+                  {{ getRoleLabel(user.role) }}
+                </span>
+              </td>
+              <td>
+                <span class="status-badge" :class="user.isEnabled ? 'status-enabled' : 'status-disabled'">
+                  {{ user.isEnabled ? '已启用' : '已禁用' }}
                 </span>
               </td>
               <td>{{ formatDate(user.createdAt) }}</td>
@@ -73,6 +79,15 @@
                     title="编辑用户"
                   >
                     ✏️ 编辑
+                  </button>
+                  <button
+                    v-if="isSuperAdmin && !isUserAdmin(user)"
+                    class="btn-toggle"
+                    :class="user.isEnabled ? 'btn-disable' : 'btn-enable'"
+                    @click="toggleEnable(user.id, user.name, user.isEnabled)"
+                    :title="user.isEnabled ? '禁用用户' : '启用用户'"
+                  >
+                    {{ user.isEnabled ? '🚫 禁用' : '✅ 启用' }}
                   </button>
                   <button
                     v-if="isSuperAdmin"
@@ -209,9 +224,34 @@ async function deleteUser(id, name) {
   }
 }
 
+// 启用/禁用用户
+async function toggleEnable(id, name, currentEnabled) {
+  const action = currentEnabled ? '禁用' : '启用'
+  if (!confirm(`确认${action}用户 "${name}" 吗？`)) return
+  
+  try {
+    await apiClient.put(`/users/${id}/toggle-enable`)
+    await fetchUsers()
+  } catch (error) {
+    errorMessage.value = `${action}失败: ` + (error.response?.data?.message || error.message)
+  }
+}
+
 // 判断用户是否为管理员
 function isUserAdmin(user) {
   return user.role === 0 || user.role === 'SuperAdmin'
+}
+
+// 角色显示
+function getRoleLabel(role) {
+  const map = { 0: '超级管理员', 1: '管理员', 2: '普通用户' }
+  return map[role] ?? '普通用户'
+}
+
+function getRoleClass(role) {
+  if (role === 0) return 'role-admin'
+  if (role === 1) return 'role-manager'
+  return 'role-user'
 }
 
 // 格式化日期
@@ -481,10 +521,72 @@ tbody tr:hover {
   border: 1px solid #ffeeba;
 }
 
+.role-manager {
+  background: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+}
+
 .role-user {
   background: #d4edda;
   color: #155724;
   border: 1px solid #c3e6cb;
+}
+
+/* 状态标签 */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-enabled {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-disabled {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* 启用/禁用按钮 */
+.btn-toggle {
+  padding: 6px 14px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-disable {
+  background: #fff3cd;
+  color: #856404;
+  border-color: #ffeeba;
+}
+
+.btn-disable:hover {
+  background: #f39c12;
+  color: white;
+  border-color: #f39c12;
+}
+
+.btn-enable {
+  background: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
+.btn-enable:hover {
+  background: #27ae60;
+  color: white;
+  border-color: #27ae60;
 }
 
 .empty-state {

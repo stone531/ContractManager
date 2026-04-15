@@ -34,6 +34,19 @@
         />
       </div>
 
+      <!-- 角色选择（仅 SuperAdmin 可见，且不能修改 SuperAdmin 的角色） -->
+      <div v-if="isSuperAdmin && !isEditingSuperAdmin" class="form-group">
+        <label for="role">用户角色</label>
+        <select id="role" v-model="form.role" class="role-select">
+          <option :value="1">管理员</option>
+          <option :value="2">普通用户</option>
+        </select>
+      </div>
+
+      <div v-if="isEditingSuperAdmin" class="info-box">
+        <span>🔒 超级管理员角色不可修改</span>
+      </div>
+
       <div class="form-actions">
         <button
           @click="handleSubmit"
@@ -126,7 +139,11 @@ const isSuperAdmin = computed(() => {
   return role === 0 || role === 'SuperAdmin'
 })
 
-const form = ref({ id: 0, name: '', email: '' })
+const isEditingSuperAdmin = computed(() => {
+  return form.value.role === 0 || form.value.role === 'SuperAdmin'
+})
+
+const form = ref({ id: 0, name: '', email: '', role: 2 })
 const loading = ref(false)
 const loadingUser = ref(false)
 const successMessage = ref('')
@@ -298,6 +315,34 @@ onMounted(loadUser)
 
 .form-group input::placeholder {
   color: #bdc3c7;
+}
+
+.form-group select,
+.role-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: all 0.3s;
+  background: white;
+  cursor: pointer;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.info-box {
+  padding: 14px 18px;
+  background: #f0f4ff;
+  border-left: 4px solid #667eea;
+  border-radius: 8px;
+  color: #5a6c7d;
+  font-size: 14px;
+  margin-bottom: 24px;
 }
 
 .form-actions {

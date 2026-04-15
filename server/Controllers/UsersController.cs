@@ -19,6 +19,13 @@ public class UsersController : ControllerBase
         _db = db;
     }
 
+    private int? GetCurrentUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (claim != null && int.TryParse(claim.Value, out var id)) return id;
+        return null;
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? search,
@@ -94,18 +101,60 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] User user)
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateUserDto dto)
     {
-        if (id != user.Id) return BadRequest("用户 ID 不匹配");
-
         var existingUser = await _db.Users.FindAsync(id);
         if (existingUser is null) return NotFound();
 
-        existingUser.Name = user.Name;
-        existingUser.Email = user.Email;
+        // 仅 SuperAdmin 可修改角色
+        var currentUserId = GetCurrentUserId();
+        var currentUser = currentUserId.HasValue ? await _db.Users.FindAsync(currentUserId.Value) : null;
+
+        existingUser.Name = dto.Name;
+        existingUser.Email = dto.Email;
+
+        // 角色修改（仅 SuperAdmin 可操作，且不允许修改自己的角色）
+        if (dto.Role.HasValue && currentUser?.Role == UserRole.SuperAdmin && existingUser.Id != currentUserId)
+        {
+            if (dto.Role.Value != UserRole.SuperAdmin) // 不允许将其他用户提升为 SuperAdmin
+            {
+                existingUser.Role = dto.Role.Value;
+            }
+        }
 
         await _db.SaveChangesAsync();
         return Ok(existingUser);
+    }
+
+    public class UpdateUserDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public UserRole? Role { get; set; }
+    }
+
+    // ────────── 启用/禁用用户 ──────────
+    [HttpPut("{id}/toggle-enable")]
+    public async Task<IActionResult> ToggleEnable(int id)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        var currentUser = await _db.Users.FindAsync(currentUserId.Value);
+        if (currentUser == null || currentUser.Role != UserRole.SuperAdmin)
+            return Forbid();
+
+        var user = await _db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+
+        // 不允许禁用自己
+        if (user.Id == currentUserId.Value)
+            return BadRequest(new { message = "不能禁用自己的账户" });
+
+        user.IsEnabled = !user.IsEnabled;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = user.IsEnabled ? "用户已启用" : "用户已禁用", isEnabled = user.IsEnabled });
     }
 
     // ────────── 管理员重置用户密码 ──────────

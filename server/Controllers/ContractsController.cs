@@ -55,62 +55,62 @@ public class ContractsController : ControllerBase
     [HttpGet("today-stats")]
     public async Task<IActionResult> GetTodayStats()
     {
-        try
+        var (userId, userName, isSuperAdmin) = await GetCurrentUserInfo();
+        var todayUtc = DateTime.UtcNow.Date;
+
+        // 今日新增合同统计（SQLite 不支持 decimal Sum，先拉到内存再求和）
+        var todayNewContracts = await _db.Contracts.CountAsync(c => c.CreatedAt >= todayUtc);
+        var todayContractAmounts = await _db.Contracts
+            .Where(c => c.CreatedAt >= todayUtc)
+            .Select(c => c.TotalAmount)
+            .ToListAsync();
+        var todayNewAmount = todayContractAmounts.Sum();
+
+        // 今日已审批支付金额
+        var todayPaidAmounts = await _db.Payments
+            .Where(p => p.Status == PaymentStatus.Approved && p.CreatedAt >= todayUtc)
+            .Select(p => p.Amount)
+            .ToListAsync();
+        var todayPaidAmount = todayPaidAmounts.Sum();
+
+        // 待审批数（仅超管）
+        int todayPendingApprovals = 0;
+        if (isSuperAdmin)
         {
-            var (userId, userName, isSuperAdmin) = await GetCurrentUserInfo();
-            var todayUtc = DateTime.UtcNow.Date;
-
-            var todayContracts = await _db.Contracts
-                .Where(c => c.CreatedAt >= todayUtc)
-                .ToListAsync();
-
-            var todayNewContracts = todayContracts.Count;
-            var todayNewAmount = todayContracts.Sum(c => c.TotalAmount);
-
-            var todayPaidAmounts = await _db.Payments
-                .Where(p => p.Status == PaymentStatus.Approved && p.CreatedAt >= todayUtc)
-                .Select(p => p.Amount)
-                .ToListAsync();
-            var todayPaidAmount = todayPaidAmounts.Sum();
-
-            int todayPendingApprovals = 0;
-            if (isSuperAdmin)
-            {
-                todayPendingApprovals += await _db.Contracts
-                    .CountAsync(c => c.ApprovalStatus == ApprovalStatus.Pending);
-                todayPendingApprovals += await _db.Contracts
-                    .CountAsync(c => c.SubmittedAmount > 0 && c.SubmittedBy != null);
-                todayPendingApprovals += await _db.Payments
-                    .CountAsync(p => p.Status == PaymentStatus.Pending);
-            }
-
-            var unreadNotifications = await _db.Notifications
-                .CountAsync(n => n.ToUserId == userId && !n.IsRead);
-
-            // 合同状态分布（全量）
-            var allContracts = await _db.Contracts.ToListAsync();
-            var byStatus = new Dictionary<string, int> { { "0", 0 }, { "1", 0 }, { "2", 0 }, { "3", 0 } };
-            foreach (var c in allContracts)
-            {
-                var key = ((int)c.ContractStatus).ToString();
-                byStatus[key] = byStatus.GetValueOrDefault(key) + 1;
-            }
-
-            return Ok(new
-            {
-                todayNewContracts,
-                todayNewAmount,
-                todayPaidAmount,
-                todayPendingApprovals,
-                unreadNotifications,
-                totalContracts = allContracts.Count,
-                byStatus
-            });
+            todayPendingApprovals += await _db.Contracts
+                .CountAsync(c => c.ApprovalStatus == ApprovalStatus.Pending);
+            todayPendingApprovals += await _db.Contracts
+                .CountAsync(c => c.SubmittedAmount > 0 && c.SubmittedBy != null);
+            todayPendingApprovals += await _db.Payments
+                .CountAsync(p => p.Status == PaymentStatus.Pending);
         }
-        catch (Exception ex)
+
+        var unreadNotifications = await _db.Notifications
+            .CountAsync(n => n.ToUserId == userId && !n.IsRead);
+
+        // 合同状态分布（数据库端 GroupBy）
+        var totalContracts = await _db.Contracts.CountAsync();
+        var statusGroups = await _db.Contracts
+            .GroupBy(c => c.ContractStatus)
+            .Select(g => new { Status = (int)g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var byStatus = new Dictionary<string, int> { { "0", 0 }, { "1", 0 }, { "2", 0 }, { "3", 0 } };
+        foreach (var g in statusGroups)
         {
-            return StatusCode(500, new { message = ex.Message, stack = ex.StackTrace });
+            byStatus[g.Status.ToString()] = g.Count;
         }
+
+        return Ok(new
+        {
+            todayNewContracts,
+            todayNewAmount,
+            todayPaidAmount,
+            todayPendingApprovals,
+            unreadNotifications,
+            totalContracts,
+            byStatus
+        });
     }
 
     // ────────── 查询 ──────────

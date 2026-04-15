@@ -134,17 +134,18 @@ const stats = ref({
   todayPendingApprovals: 0,
   unreadNotifications: 0,
   totalContracts: 0,
-  byStatus: { 0: 0, 1: 0, 2: 0, 3: 0 }
+  byStatus: {}
 })
 
 const statusDistribution = computed(() => {
   const s = stats.value.byStatus
   const total = stats.value.totalContracts || 1
+  const get = (key) => s[key] || s[String(key)] || 0
   return [
-    { label: '初始', count: s[0] || 0, color: '#95a5a6', percent: ((s[0] || 0) / total) * 100 },
-    { label: '进行中', count: s[1] || 0, color: '#3498db', percent: ((s[1] || 0) / total) * 100 },
-    { label: '已完成', count: s[2] || 0, color: '#27ae60', percent: ((s[2] || 0) / total) * 100 },
-    { label: '已终止', count: s[3] || 0, color: '#e74c3c', percent: ((s[3] || 0) / total) * 100 }
+    { label: '初始', count: get(0), color: '#95a5a6', percent: (get(0) / total) * 100 },
+    { label: '进行中', count: get(1), color: '#3498db', percent: (get(1) / total) * 100 },
+    { label: '已完成', count: get(2), color: '#27ae60', percent: (get(2) / total) * 100 },
+    { label: '已终止', count: get(3), color: '#e74c3c', percent: (get(3) / total) * 100 }
   ]
 })
 
