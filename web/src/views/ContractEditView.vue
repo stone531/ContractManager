@@ -111,7 +111,7 @@ async function fetchContract() {
   error.value = null
   try {
     const id = route.params.id
-    const response = await axios.get(`/api/contracts/${id}`)
+    const response = await axios.get(`/contracts/${id}`)
     contract.value = response.data
     
     // 预填充表单
@@ -171,7 +171,7 @@ async function handleSubmit() {
   submitting.value = true
 
   try {
-    await axios.put(`/api/contracts/${contract.value.id}`, {
+    await axios.put(`/contracts/${contract.value.id}`, {
       name: form.value.name,
       description: form.value.description,
       totalAmount: form.value.totalAmount

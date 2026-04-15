@@ -11,6 +11,8 @@ import ContractListView from '../views/ContractListView.vue'
 import ContractAddView from '../views/ContractAddView.vue'
 import ContractDetailView from '../views/ContractDetailView.vue'
 import ContractEditView from '../views/ContractEditView.vue'
+import ApprovalManagementView from '../views/ApprovalManagementView.vue'
+import NotificationView from '../views/NotificationView.vue'
 
 const routes = [
   {
@@ -70,6 +72,18 @@ const routes = [
         path: 'contracts/edit/:id',
         name: 'ContractEdit',
         component: ContractEditView,
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'contracts/approval',
+        name: 'ApprovalManagement',
+        component: ApprovalManagementView,
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'notifications',
+        name: 'Notifications',
+        component: NotificationView,
         meta: { requiresAuth: true }
       },
       {

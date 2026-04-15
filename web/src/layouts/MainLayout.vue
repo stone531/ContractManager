@@ -19,7 +19,8 @@
       <!-- 侧边栏 -->
       <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
         <nav class="menu">
-          <div class="menu-group">
+          <!-- 用户管理（仅 SuperAdmin 显示） -->
+          <div v-if="isSuperAdmin" class="menu-group">
             <!-- 可点击的菜单组标题 -->
             <div 
               class="menu-group-header" 
@@ -79,6 +80,23 @@
               </div>
             </transition>
           </div>
+
+          <!-- 审批管理（仅 SuperAdmin 显示） -->
+          <div v-if="isSuperAdmin" class="menu-group">
+            <router-link to="/contracts/approval" class="menu-item">
+              <span class="menu-icon">✅</span>
+              <span class="menu-text">审批管理</span>
+            </router-link>
+          </div>
+
+          <!-- 通知管理（所有角色可见） -->
+          <div class="menu-group">
+            <router-link to="/notifications" class="menu-item">
+              <span class="menu-icon">🔔</span>
+              <span class="menu-text">通知管理</span>
+              <span v-if="unreadCount > 0" class="badge">{{ unreadCount }}</span>
+            </router-link>
+          </div>
         </nav>
       </aside>
 
@@ -91,13 +109,33 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import apiClient from '../api/axios'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const sidebarCollapsed = ref(false)
+const unreadCount = ref(0)
+
+const isSuperAdmin = computed(() => {
+  const role = authStore.user?.role
+  return role === 0 || role === 'SuperAdmin'
+})
+
+async function fetchUnreadCount() {
+  try {
+    const res = await apiClient.get('/notifications/unread-count')
+    unreadCount.value = res.data.count
+  } catch (e) { /* ignore */ }
+}
+
+// 每30秒刷新未读数
+onMounted(() => {
+  fetchUnreadCount()
+  setInterval(fetchUnreadCount, 30000)
+})
 
 // 菜单组展开状态
 const menuGroups = ref({
@@ -403,6 +441,20 @@ function handleLogout() {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+}
+
+/* 未读红点 */
+.badge {
+  background: #e74c3c;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 14px;
+  margin-left: auto;
 }
 
 /* 响应式设计 */

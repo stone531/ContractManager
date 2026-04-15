@@ -4,11 +4,11 @@
       <h1>用户登录</h1>
       <form @submit.prevent="handleLogin" class="auth-form">
         <div class="form-group">
-          <label>邮箱</label>
+          <label>用户名</label>
           <input
-            v-model="form.email"
-            type="email"
-            placeholder="请输入邮箱"
+            v-model="form.username"
+            type="text"
+            placeholder="请输入用户名"
             required
           />
         </div>
@@ -17,9 +17,8 @@
           <input
             v-model="form.password"
             type="password"
-            placeholder=" 请输入密码（至少6个字符）"
+            placeholder="请输入密码"
             required
-            minlength="6"
           />
         </div>
         <p v-if="error" class="error">{{ error }}</p>
@@ -43,7 +42,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const form = ref({
-  email: '',
+  username: '',
   password: ''
 })
 
@@ -54,12 +53,12 @@ async function handleLogin() {
   loading.value = true
   error.value = ''
 
-  const result = await authStore.login(form.value.email, form.value.password)
+  const result = await authStore.login(form.value.username, form.value.password)
 
   loading.value = false
 
   if (result.success) {
-    router.push('/users')
+    router.push('/')
   } else {
     error.value = result.message
   }

@@ -67,6 +67,28 @@
           </div>
         </div>
 
+        <!-- 提交金额变更（非超管可见） -->
+        <div v-if="!isSuperAdmin && contract.approvalStatus === 1" class="submit-amount-section">
+          <div class="submit-amount-header">
+            <h4>📝 提交金额变更</h4>
+            <button @click="showAmountForm = !showAmountForm" class="toggle-btn">
+              {{ showAmountForm ? '取消' : '提交金额变更' }}
+            </button>
+          </div>
+          <div v-if="showAmountForm" class="submit-amount-form">
+            <div class="amount-input">
+              <span class="currency">¥</span>
+              <input v-model.number="submitAmountValue" type="number" step="0.01" min="0.01" placeholder="请输入新金额" />
+            </div>
+            <button @click="handleSubmitAmount" class="submit-btn" :disabled="!submitAmountValue || submittingAmount">
+              {{ submittingAmount ? '提交中...' : '✓ 提交审批' }}
+            </button>
+          </div>
+          <div v-if="contract.submittedAmount > 0" class="pending-info">
+            ⏳ 已提交待审核金额：¥{{ formatAmount(contract.submittedAmount) }}
+          </div>
+        </div>
+
         <div class="progress-section">
           <div class="progress-bar">
             <div 
@@ -166,9 +188,16 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '../api/axios'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+
+const isSuperAdmin = computed(() => {
+  const role = authStore.user?.role
+  return role === 0 || role === 'SuperAdmin'
+})
 
 const contract = ref(null)
 const payments = ref([])
@@ -177,6 +206,25 @@ const error = ref(null)
 const showAddPayment = ref(false)
 const submitting = ref(false)
 const paymentError = ref(null)
+
+const showAmountForm = ref(false)
+const submitAmountValue = ref(null)
+const submittingAmount = ref(false)
+
+async function handleSubmitAmount() {
+  submittingAmount.value = true
+  try {
+    await axios.post(`/contracts/${contract.value.id}/submit-amount`, { amount: submitAmountValue.value })
+    alert('金额已提交审批')
+    showAmountForm.value = false
+    submitAmountValue.value = null
+    await fetchContract()
+  } catch (err) {
+    alert('提交失败：' + (err.response?.data?.message || err.message))
+  } finally {
+    submittingAmount.value = false
+  }
+}
 
 const paymentForm = ref({
   amount: 0,
@@ -189,7 +237,7 @@ async function fetchContract() {
   error.value = null
   try {
     const id = route.params.id
-    const response = await axios.get(`/api/contracts/${id}`)
+    const response = await axios.get(`/contracts/${id}`)
     contract.value = response.data
     payments.value = response.data.payments || []
   } catch (err) {
@@ -201,7 +249,7 @@ async function fetchContract() {
 
 async function downloadFile() {
   try {
-    const response = await axios.get(`/api/contracts/${contract.value.id}/download`, {
+    const response = await axios.get(`/contracts/${contract.value.id}/download`, {
       responseType: 'blob'
     })
     
@@ -223,7 +271,7 @@ async function handleAddPayment() {
   submitting.value = true
 
   try {
-    await axios.post(`/api/contracts/${contract.value.id}/payments`, paymentForm.value)
+    await axios.post(`/contracts/${contract.value.id}/payments`, paymentForm.value)
     
     // 重新加载数据
     await fetchContract()
@@ -471,6 +519,54 @@ onMounted(() => {
   font-size: 24px;
   font-weight: 700;
   color: #2c3e50;
+}
+
+.submit-amount-section {
+  margin: 20px 0;
+  padding: 16px;
+  background: #f0f4ff;
+  border-radius: 8px;
+  border: 1px solid #d0d8ff;
+}
+
+.submit-amount-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.submit-amount-header h4 { margin: 0; color: #2c3e50; }
+
+.toggle-btn {
+  padding: 8px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.toggle-btn:hover { background: #5a6fd6; }
+
+.submit-amount-form {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.submit-amount-form .amount-input { flex: 1; }
+.submit-amount-form .amount-input input { width: 100%; padding: 10px 14px 10px 32px; border: 2px solid #d0d8ff; border-radius: 6px; font-size: 15px; }
+
+.pending-info {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #fff3cd;
+  border-radius: 6px;
+  color: #856404;
+  font-size: 14px;
 }
 
 .progress-section {

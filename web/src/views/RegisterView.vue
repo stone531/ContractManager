@@ -4,6 +4,15 @@
       <h1>用户注册</h1>
       <form @submit.prevent="handleRegister" class="auth-form">
         <div class="form-group">
+          <label>用户名</label>
+          <input
+            v-model="form.username"
+            type="text"
+            placeholder="请输入用户名"
+            required
+          />
+        </div>
+        <div class="form-group">
           <label>姓名</label>
           <input
             v-model="form.name"
@@ -52,6 +61,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const form = ref({
+  username: '',
   name: '',
   email: '',
   password: ''
@@ -64,12 +74,12 @@ async function handleRegister() {
   loading.value = true
   error.value = ''
 
-  const result = await authStore.register(form.value.name, form.value.email, form.value.password)
+  const result = await authStore.register(form.value.username, form.value.name, form.value.email, form.value.password)
 
   loading.value = false
 
   if (result.success) {
-    router.push('/users')
+    router.push('/')
   } else {
     error.value = result.message
   }

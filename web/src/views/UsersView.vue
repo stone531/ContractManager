@@ -28,8 +28,11 @@
           <thead>
             <tr>
               <th>ID</th>
+              <th>用户名</th>
               <th>姓名</th>
               <th>邮箱</th>
+              <th>角色</th>
+              <th>状态</th>
               <th>创建时间</th>
               <th>操作</th>
             </tr>
@@ -37,11 +40,21 @@
           <tbody>
             <tr v-for="user in users" :key="user.id">
               <td>{{ user.id }}</td>
+              <td>{{ user.userName }}</td>
               <td>{{ user.name }}</td>
               <td>{{ user.email }}</td>
+              <td>{{ getRoleLabel(user.role) }}</td>
+              <td>{{ user.isEnabled ? '启用' : '禁用' }}</td>
               <td>{{ new Date(user.createdAt).toLocaleString() }}</td>
               <td>
-                <button class="del" @click="deleteUser(user.id)">删除</button>
+                <button 
+                  class="del" 
+                  @click="deleteUser(user.id)"
+                  :disabled="isCannotDelete(user)"
+                  :title="isCannotDelete(user) ? '超级管理员无法删除自己' : '删除'"
+                >
+                  删除
+                </button>
               </td>
             </tr>
           </tbody>
@@ -97,6 +110,16 @@ async function deleteUser(id) {
   } catch (e) {
     error.value = '删除失败: ' + (e.response?.data?.message || e.message)
   }
+}
+
+function getRoleLabel(role) {
+  const labels = { 0: 'SuperAdmin', 1: 'Admin', 2: 'User' }
+  return labels[role] || 'Unknown'
+}
+
+function isCannotDelete(user) {
+  // 当前用户是 SuperAdmin 且是同一用户，则不能删除
+  return authStore.user?.id === user.id && user.role === 0
 }
 
 function handleLogout() {
@@ -213,8 +236,14 @@ button.del {
   font-size: 13px;
 }
 
-button.del:hover {
+button.del:hover:not(:disabled) {
   background: #c0392b;
+}
+
+button.del:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .table-wrap {

@@ -28,11 +28,46 @@
         />
       </div>
 
+      <div class="form-group">
+        <label for="username">用户名 <span class="required">*</span></label>
+        <input
+          id="username"
+          v-model="form.username"
+          type="text"
+          placeholder="请输入用户名"
+          @keyup.enter="handleSubmit"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">密码 <span class="required">*</span></label>
+        <input
+          id="password"
+          v-model="form.password"
+          type="password"
+          placeholder="请输入初始密码（至少6个字符）"
+          minlength="6"
+          @keyup.enter="handleSubmit"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="role">角色 <span class="required">*</span></label>
+        <select
+          id="role"
+          v-model.number="form.role"
+          @keyup.enter="handleSubmit"
+        >
+          <option :value="1">管理员（Admin）</option>
+          <option :value="2">普通用户（User）</option>
+        </select>
+      </div>
+
       <div class="form-actions">
         <button
-          @click="handleSubmit"
-          :disabled="!form.name || !form.email || loading"
-          class="btn-primary"
+        @click="handleSubmit"
+        :disabled="!form.name || !form.email || !form.username || !form.password || form.role === null || loading"
+        class="btn-primary"
         >
           <span v-if="loading">提交中...</span>
           <span v-else>✓ 提交</span>
@@ -63,14 +98,19 @@ import { useRouter } from 'vue-router'
 import apiClient from '../api/axios'
 
 const router = useRouter()
-const form = ref({ name: '', email: '' })
+const form = ref({ name: '', email: '', username: '', password: '', role: null })
 const loading = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
 
 async function handleSubmit() {
-  if (!form.value.name || !form.value.email) {
+  if (!form.value.name || !form.value.email || !form.value.username || !form.value.password) {
     errorMessage.value = '请填写所有必填字段'
+    return
+  }
+
+  if (form.value.password.length < 6) {
+    errorMessage.value = '密码至少需要 6 个字符'
     return
   }
 
@@ -81,7 +121,7 @@ async function handleSubmit() {
   try {
     await apiClient.post('/users', form.value)
     successMessage.value = `用户 "${form.value.name}" 添加成功！`
-    form.value = { name: '', email: '' }
+    form.value = { name: '', email: '', username: '', password: '', role: null }
     
     // 3秒后自动跳转到用户列表
     setTimeout(() => {
@@ -95,7 +135,7 @@ async function handleSubmit() {
 }
 
 function handleReset() {
-  form.value = { name: '', email: '' }
+  form.value = { name: '', email: '', username: '', password: '', role: null }
   errorMessage.value = ''
   successMessage.value = ''
 }

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -54,7 +55,12 @@ builder.Services.AddCors(options =>
               .AllowCredentials());
 });
 
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -74,36 +80,6 @@ using (var scope = app.Services.CreateScope())
     // 若数据库不存在则创建（会根据当前模型建表）
     db.Database.EnsureCreated();
 
-    // 兜底：确保合同与付款表存在（处理历史数据库结构不完整的情况）
-    db.Database.ExecuteSqlRaw(@"
-        CREATE TABLE IF NOT EXISTS Contracts (
-            Id INTEGER NOT NULL CONSTRAINT PK_Contracts PRIMARY KEY AUTOINCREMENT,
-            Name TEXT NOT NULL,
-            Description TEXT NULL,
-            FileName TEXT NULL,
-            FilePath TEXT NULL,
-            TotalAmount TEXT NOT NULL,
-            OriginalAmount TEXT NOT NULL,
-            PaidAmount TEXT NOT NULL,
-            CreatedAt TEXT NOT NULL,
-            UpdatedAt TEXT NULL
-        );
-    ");
-
-    db.Database.ExecuteSqlRaw(@"
-        CREATE TABLE IF NOT EXISTS Payments (
-            Id INTEGER NOT NULL CONSTRAINT PK_Payments PRIMARY KEY AUTOINCREMENT,
-            ContractId INTEGER NOT NULL,
-            Amount TEXT NOT NULL,
-            PaymentDate TEXT NOT NULL,
-            Note TEXT NULL,
-            CreatedAt TEXT NOT NULL,
-            CONSTRAINT FK_Payments_Contracts_ContractId FOREIGN KEY (ContractId) REFERENCES Contracts (Id) ON DELETE CASCADE
-        );
-    ");
-
-    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_Payments_ContractId ON Payments (ContractId);");
-
     SeedInitialData(db);
 }
 
@@ -119,16 +95,20 @@ static void SeedInitialData(AppDbContext db)
     {
         var hasher = new PasswordHasher<User>();
 
-        var u1 = new User { Name = "张三", Email = "zhangsan@example.com", CreatedAt = DateTime.UtcNow };
+        // 超管 admin
+        var admin = new User { UserName = "admin", Name = "超级管理员", Email = "admin@example.com", Role = UserRole.SuperAdmin, IsEnabled = true, CreatedAt = DateTime.UtcNow };
+        admin.PasswordHash = hasher.HashPassword(admin, "admin");
+
+        var u1 = new User { UserName = "zhangsan", Name = "张三", Email = "zhangsan@example.com", Role = UserRole.User, IsEnabled = true, CreatedAt = DateTime.UtcNow };
         u1.PasswordHash = hasher.HashPassword(u1, "password123");
 
-        var u2 = new User { Name = "李四", Email = "lisi@example.com", CreatedAt = DateTime.UtcNow };
+        var u2 = new User { UserName = "lisi", Name = "李四", Email = "lisi@example.com", Role = UserRole.User, IsEnabled = true, CreatedAt = DateTime.UtcNow };
         u2.PasswordHash = hasher.HashPassword(u2, "password123");
 
-        var u3 = new User { Name = "王五", Email = "wangwu@example.com", CreatedAt = DateTime.UtcNow };
+        var u3 = new User { UserName = "wangwu", Name = "王五", Email = "wangwu@example.com", Role = UserRole.User, IsEnabled = true, CreatedAt = DateTime.UtcNow };
         u3.PasswordHash = hasher.HashPassword(u3, "password123");
 
-        db.Users.AddRange(u1, u2, u3);
+        db.Users.AddRange(admin, u1, u2, u3);
         db.SaveChanges();
     }
 

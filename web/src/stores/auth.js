@@ -20,9 +20,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 用户登录
-  async function login(email, password) {
+  async function login(username, password) {
     try {
-      const response = await authAPI.login(email, password)
+      const response = await authAPI.login(username, password)
       const { token: newToken, user: newUser } = response.data
 
       // 保存到状态
@@ -43,9 +43,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 用户注册
-  async function register(name, email, password) {
+  async function register(username, name, email, password) {
     try {
-      const response = await authAPI.register(name, email, password)
+      const response = await authAPI.register(username, name, email, password)
       const { token: newToken, user: newUser } = response.data
 
       // 保存到状态

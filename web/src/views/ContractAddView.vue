@@ -147,7 +147,7 @@ async function handleSubmit() {
       formData.append('file', selectedFile.value)
     }
 
-    await axios.post('/api/contracts', formData, {
+    await axios.post('/contracts', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }

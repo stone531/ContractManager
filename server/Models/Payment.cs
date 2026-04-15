@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace server.Models;
 
@@ -25,6 +26,7 @@ public class Payment
     // 创建时间
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    // 关联的合�?
+    [JsonIgnore]
+    // 关联的合�?
     public Contract Contract { get; set; } = null!;
 }
