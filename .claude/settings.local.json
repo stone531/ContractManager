@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(dotnet add:*)",
-      "Bash(dotnet ef:*)"
+      "Bash(dotnet ef:*)",
+      "Bash(gh pr:*)",
+      "Bash(claude mcp:*)",
+      "Bash(uvx --version)",
+      "Bash(uv --version)",
+      "Bash(pip install:*)",
+      "Bash(python -c \"import mcp_server_sqlite; print\\(mcp_server_sqlite.__file__\\)\")",
+      "Bash(python -c \"from mcp_server_sqlite import main; print\\(main\\)\")",
+      "Bash(python -c \"from mcp_server_sqlite import main; help\\(main\\)\")",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(dotnet build:*)"
     ]
   }
 }

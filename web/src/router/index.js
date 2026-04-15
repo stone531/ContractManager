@@ -11,8 +11,12 @@ import ContractListView from '../views/ContractListView.vue'
 import ContractAddView from '../views/ContractAddView.vue'
 import ContractDetailView from '../views/ContractDetailView.vue'
 import ContractEditView from '../views/ContractEditView.vue'
-import ApprovalManagementView from '../views/ApprovalManagementView.vue'
-import NotificationView from '../views/NotificationView.vue'
+import ContractApprovalView from '../views/ContractApprovalView.vue'
+import AmountApprovalView from '../views/AmountApprovalView.vue'
+import ContractNotificationView from '../views/ContractNotificationView.vue'
+import AmountNotificationView from '../views/AmountNotificationView.vue'
+import PaymentApprovalView from '../views/PaymentApprovalView.vue'
+import ChangePasswordView from '../views/ChangePasswordView.vue'
 
 const routes = [
   {
@@ -75,21 +79,45 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'contracts/approval',
-        name: 'ApprovalManagement',
-        component: ApprovalManagementView,
-        meta: { requiresAuth: true }
-      },
-      {
-        path: 'notifications',
-        name: 'Notifications',
-        component: NotificationView,
-        meta: { requiresAuth: true }
-      },
-      {
         path: 'contracts/:id',
         name: 'ContractDetail',
         component: ContractDetailView,
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'approval/contracts',
+        name: 'ContractApproval',
+        component: ContractApprovalView,
+        meta: { requiresAuth: true, requiresSuperAdmin: true }
+      },
+      {
+        path: 'approval/amounts',
+        name: 'AmountApproval',
+        component: AmountApprovalView,
+        meta: { requiresAuth: true, requiresSuperAdmin: true }
+      },
+      {
+        path: 'approval/payments',
+        name: 'PaymentApproval',
+        component: PaymentApprovalView,
+        meta: { requiresAuth: true, requiresSuperAdmin: true }
+      },
+      {
+        path: 'notifications/contract',
+        name: 'ContractNotification',
+        component: ContractNotificationView,
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'notifications/amount',
+        name: 'AmountNotification',
+        component: AmountNotificationView,
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'change-password',
+        name: 'ChangePassword',
+        component: ChangePasswordView,
         meta: { requiresAuth: true }
       }
     ]
@@ -106,11 +134,16 @@ router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    // 需要认证但未登录，重定向到登录页
     next('/login')
   } else if ((to.path === '/login' || to.path === '/register') && authStore.isAuthenticated) {
-    // 已登录用户访问登录/注册页，重定向到首页
     next('/')
+  } else if (to.meta.requiresSuperAdmin) {
+    const role = authStore.user?.role
+    if (role === 0 || role === 'SuperAdmin') {
+      next()
+    } else {
+      next('/')
+    }
   } else {
     next()
   }

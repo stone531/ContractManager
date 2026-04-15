@@ -9,7 +9,10 @@ public enum NotificationType
     ContractApproved = 2,     // 合同审批通过
     ContractRejected = 3,     // 合同审批驳回
     AmountApproved = 4,       // 金额审批通过
-    AmountRejected = 5        // 金额审批驳回
+    AmountRejected = 5,       // 金额审批驳回
+    PaymentApproval = 6,      // 支付审批通知
+    PaymentApproved = 7,      // 支付审批通过
+    PaymentRejected = 8       // 支付审批驳回
 }
 
 public class Notification

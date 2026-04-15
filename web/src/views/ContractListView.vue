@@ -57,6 +57,17 @@
           </select>
         </div>
 
+        <div class="form-item">
+          <label>合同状态</label>
+          <select v-model="searchForm.contractStatus">
+            <option value="">全部</option>
+            <option value="0">初始</option>
+            <option value="1">进行中</option>
+            <option value="2">已完成</option>
+            <option value="3">已终止</option>
+          </select>
+        </div>
+
         <div class="form-actions">
           <button @click="handleSearch" class="search-btn">🔍 搜索</button>
           <button @click="handleReset" class="reset-btn">🔄 重置</button>
@@ -81,6 +92,7 @@
             <th>已支付</th>
             <th>进度</th>
             <th>审批状态</th>
+            <th>合同状态</th>
             <th>创建时间</th>
             <th>操作</th>
           </tr>
@@ -107,6 +119,11 @@
             <td class="cell-status">
               <span class="approval-badge" :class="'approval-' + contract.approvalStatus">
                 {{ getApprovalText(contract.approvalStatus) }}
+              </span>
+            </td>
+            <td class="cell-status">
+              <span class="contract-status-badge" :class="'cs-' + contract.contractStatus">
+                {{ getContractStatusText(contract.contractStatus) }}
               </span>
             </td>
             <td class="cell-date">{{ formatDate(contract.createdAt) }}</td>
@@ -142,47 +159,97 @@
                 >
                   📥
                 </button>
+                <button
+                  v-if="isSuperAdmin"
+                  @click="deleteContract(contract.id, contract.name)"
+                  class="action-btn delete-btn"
+                  title="删除合同"
+                >
+                  🗑️
+                </button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
+
+      <!-- 分页 -->
+      <div class="pagination">
+        <span class="pagination-info">共 {{ totalCount }} 条记录，第 {{ currentPage }} / {{ totalPages }} 页</span>
+        <div class="pagination-buttons">
+          <button
+            class="page-btn"
+            :disabled="currentPage <= 1"
+            @click="goToPage(currentPage - 1)"
+          >
+            ◀ 上一页
+          </button>
+          <button
+            class="page-btn"
+            :disabled="currentPage >= totalPages"
+            @click="goToPage(currentPage + 1)"
+          >
+            下一页 ▶
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import axios from '../api/axios'
 
 const router = useRouter()
+const authStore = useAuthStore()
+
+const isSuperAdmin = computed(() => {
+  const role = authStore.user?.role
+  return role === 0 || role === 'SuperAdmin'
+})
 const contracts = ref([])
 const loading = ref(false)
 const error = ref(null)
+
+// 分页状态
+const currentPage = ref(1)
+const pageSize = ref(10)
+const totalCount = ref(0)
+
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(totalCount.value / pageSize.value))
+})
 
 const searchForm = ref({
   name: '',
   number: '',
   startDate: '',
   endDate: '',
-  approvalStatus: ''
+  approvalStatus: '',
+  contractStatus: ''
 })
 
-async function fetchContracts(params = {}) {
+async function fetchContracts() {
   loading.value = true
   error.value = null
   try {
     const response = await axios.get('/contracts', {
       params: {
-        name: params.name || searchForm.value.name || undefined,
-        number: params.number || searchForm.value.number || undefined,
-        startDate: params.startDate || searchForm.value.startDate || undefined,
-        endDate: params.endDate || searchForm.value.endDate || undefined,
-        approvalStatus: searchForm.value.approvalStatus !== '' ? searchForm.value.approvalStatus : undefined
+        name: searchForm.value.name || undefined,
+        number: searchForm.value.number || undefined,
+        startDate: searchForm.value.startDate || undefined,
+        endDate: searchForm.value.endDate || undefined,
+        approvalStatus: searchForm.value.approvalStatus !== '' ? searchForm.value.approvalStatus : undefined,
+        contractStatus: searchForm.value.contractStatus !== '' ? searchForm.value.contractStatus : undefined,
+        page: currentPage.value,
+        pageSize: pageSize.value
       }
     })
-    contracts.value = response.data
+    contracts.value = response.data.items
+    totalCount.value = response.data.total
   } catch (err) {
     error.value = '加载合同失败：' + (err.response?.data?.message || err.message)
   } finally {
@@ -191,11 +258,17 @@ async function fetchContracts(params = {}) {
 }
 
 function handleSearch() {
+  currentPage.value = 1
   fetchContracts()
 }
 
 function getApprovalText(status) {
   const map = { 0: '待审核', 1: '已通过', 2: '已拒绝' }
+  return map[status] ?? '未知'
+}
+
+function getContractStatusText(status) {
+  const map = { 0: '初始', 1: '进行中', 2: '已完成', 3: '已终止' }
   return map[status] ?? '未知'
 }
 
@@ -205,8 +278,17 @@ function handleReset() {
     number: '',
     startDate: '',
     endDate: '',
-    approvalStatus: ''
+    approvalStatus: '',
+    contractStatus: ''
   }
+  currentPage.value = 1
+  fetchContracts()
+}
+
+// 翻页
+function goToPage(page) {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
   fetchContracts()
 }
 
@@ -218,10 +300,19 @@ function editContract(id) {
   router.push(`/contracts/edit/${id}`)
 }
 
-function previewFile(id, filename) {
-  // 在新标签页打开预览
-  const fileUrl = `/api/contracts/${id}/download`
-  window.open(fileUrl, '_blank')
+async function previewFile(id, filename) {
+  try {
+    const response = await axios.get(`/contracts/${id}/download`, {
+      responseType: 'blob'
+    })
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    // 延迟释放，给浏览器时间加载
+    setTimeout(() => window.URL.revokeObjectURL(url), 10000)
+  } catch (err) {
+    alert('预览失败：' + (err.response?.data?.message || err.message))
+  }
 }
 
 async function downloadFile(id, filename) {
@@ -261,6 +352,16 @@ function getProgress(contract) {
 
 function formatAmount(amount) {
   return amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+async function deleteContract(id, name) {
+  if (!confirm(`确定要删除合同「${name}」吗？此操作不可恢复。`)) return
+  try {
+    await axios.delete(`/contracts/${id}`)
+    await fetchContracts()
+  } catch (err) {
+    alert('删除失败：' + (err.response?.data?.message || err.message))
+  }
 }
 
 function formatDate(dateString) {
@@ -322,7 +423,7 @@ onMounted(() => {
 
 .search-group {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: 1fr 1fr 2fr 1fr 1fr auto;
   gap: 16px;
   align-items: flex-end;
 }
@@ -576,10 +677,22 @@ onMounted(() => {
 .approval-1 { background: #d4edda; color: #155724; }
 .approval-2 { background: #f8d7da; color: #721c24; }
 
+.contract-status-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.cs-0 { background: #e2e3e5; color: #383d41; }
+.cs-1 { background: #cce5ff; color: #004085; }
+.cs-2 { background: #d4edda; color: #155724; }
+.cs-3 { background: #f5c6cb; color: #721c24; }
+
 .cell-date {
   color: #7f8c8d;
   font-size: 13px;
-  min-width: 100px;
+  min-width: 140px;
+  white-space: nowrap;
+}
+
+.cell-status {
+  white-space: nowrap;
+  width: 1%;
 }
 
 .cell-actions {
@@ -648,6 +761,58 @@ onMounted(() => {
   transform: scale(1.1);
 }
 
+.delete-btn {
+  background: #e74c3c;
+  color: white;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+  transform: scale(1.1);
+}
+
+/* 分页 */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-top: 1px solid #ecf0f1;
+}
+
+.pagination-info {
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.page-btn {
+  padding: 8px 18px;
+  background: #f5f7fa;
+  color: #34495e;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* 响应式设计 */
 @media (max-width: 1200px) {
   .contracts-table {
@@ -714,6 +879,12 @@ onMounted(() => {
 
   .cell-number {
     max-width: 80px;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
   }
 }
 </style>

@@ -60,23 +60,83 @@
         <button @click="errorMessage = ''" class="alert-close">×</button>
       </div>
     </div>
+
+    <!-- 管理员重置密码区域 -->
+    <div v-if="!loadingUser && isSuperAdmin" class="form-card reset-password-card">
+      <h3 class="section-title">🔑 重置用户密码</h3>
+      <p class="section-desc">为该用户设置新密码（最少6位）</p>
+
+      <div class="form-group">
+        <label for="newPassword">新密码 <span class="required">*</span></label>
+        <input
+          id="newPassword"
+          v-model="resetForm.newPassword"
+          type="password"
+          placeholder="请输入新密码（至少6位）"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="confirmPassword">确认密码 <span class="required">*</span></label>
+        <input
+          id="confirmPassword"
+          v-model="resetForm.confirmPassword"
+          type="password"
+          placeholder="请再次输入新密码"
+          @keyup.enter="handleResetPassword"
+        />
+      </div>
+
+      <div class="form-actions">
+        <button
+          @click="handleResetPassword"
+          :disabled="!resetForm.newPassword || !resetForm.confirmPassword || resetting"
+          class="btn-warning"
+        >
+          <span v-if="resetting">重置中...</span>
+          <span v-else>🔑 重置密码</span>
+        </button>
+      </div>
+
+      <div v-if="resetSuccess" class="alert alert-success">
+        {{ resetSuccess }}
+        <button @click="resetSuccess = ''" class="alert-close">×</button>
+      </div>
+      <div v-if="resetError" class="alert alert-error">
+        {{ resetError }}
+        <button @click="resetError = ''" class="alert-close">×</button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import apiClient from '../api/axios'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 const userId = ref(route.params.id)
+
+const isSuperAdmin = computed(() => {
+  const role = authStore.user?.role
+  return role === 0 || role === 'SuperAdmin'
+})
 
 const form = ref({ id: 0, name: '', email: '' })
 const loading = ref(false)
 const loadingUser = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+
+// 重置密码相关
+const resetForm = ref({ newPassword: '', confirmPassword: '' })
+const resetting = ref(false)
+const resetSuccess = ref('')
+const resetError = ref('')
 
 // 加载用户数据
 async function loadUser() {
@@ -116,6 +176,34 @@ async function handleSubmit() {
     errorMessage.value = '更新失败: ' + (error.response?.data?.message || error.message)
   } finally {
     loading.value = false
+  }
+}
+
+// 管理员重置密码
+async function handleResetPassword() {
+  resetSuccess.value = ''
+  resetError.value = ''
+
+  if (resetForm.value.newPassword.length < 6) {
+    resetError.value = '密码至少需要 6 个字符'
+    return
+  }
+  if (resetForm.value.newPassword !== resetForm.value.confirmPassword) {
+    resetError.value = '两次输入的密码不一致'
+    return
+  }
+
+  resetting.value = true
+  try {
+    const res = await apiClient.put(`/users/${userId.value}/reset-password`, {
+      newPassword: resetForm.value.newPassword
+    })
+    resetSuccess.value = res.data.message || '密码重置成功'
+    resetForm.value = { newPassword: '', confirmPassword: '' }
+  } catch (error) {
+    resetError.value = '重置失败: ' + (error.response?.data?.message || error.message)
+  } finally {
+    resetting.value = false
   }
 }
 
@@ -308,5 +396,41 @@ button {
 
 .alert-close:hover {
   opacity: 1;
+}
+
+/* 重置密码区域 */
+.reset-password-card {
+  margin-top: 24px;
+  border-top: 3px solid #f39c12;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  color: #2c3e50;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.section-desc {
+  color: #7f8c8d;
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  color: white;
+  flex: 1;
+}
+
+.btn-warning:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4);
+}
+
+.btn-warning:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>

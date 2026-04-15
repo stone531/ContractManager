@@ -39,6 +39,17 @@
           <div class="info-value">¥{{ formatAmount(contract.originalAmount) }}</div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label for="startDate">合同生效日期</label>
+            <input id="startDate" v-model="form.startDate" type="date" />
+          </div>
+          <div class="form-group">
+            <label for="endDate">合同到期日期</label>
+            <input id="endDate" v-model="form.endDate" type="date" />
+          </div>
+        </div>
+
         <!-- 合同总金额编辑 -->
         <div class="form-group">
           <label for="totalAmount">合同总金额 <span class="required">*</span></label>
@@ -101,7 +112,9 @@ const success = ref(null)
 const form = ref({
   name: '',
   description: '',
-  totalAmount: 0
+  totalAmount: 0,
+  startDate: '',
+  endDate: ''
 })
 
 const amountDifference = ref(0)
@@ -118,7 +131,9 @@ async function fetchContract() {
     form.value = {
       name: response.data.name,
       description: response.data.description || '',
-      totalAmount: response.data.totalAmount
+      totalAmount: response.data.totalAmount,
+      startDate: response.data.startDate ? response.data.startDate.split('T')[0] : '',
+      endDate: response.data.endDate ? response.data.endDate.split('T')[0] : ''
     }
     
     calculateDifference()
@@ -174,7 +189,9 @@ async function handleSubmit() {
     await axios.put(`/contracts/${contract.value.id}`, {
       name: form.value.name,
       description: form.value.description,
-      totalAmount: form.value.totalAmount
+      totalAmount: form.value.totalAmount,
+      startDate: form.value.startDate || null,
+      endDate: form.value.endDate || null
     })
 
     success.value = '合同更新成功！即将跳转...'
@@ -283,6 +300,23 @@ onMounted(() => {
 
 .form-group input[type="text"]:focus,
 .form-group textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.form-row .form-group input[type="date"] {
+  padding: 12px 16px;
+  border: 2px solid #ecf0f1;
+  border-radius: 8px;
+  font-size: 14px;
+  width: 100%;
+}
+.form-row .form-group input[type="date"]:focus {
   outline: none;
   border-color: #667eea;
 }

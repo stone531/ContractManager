@@ -6,10 +6,12 @@
         <button class="menu-toggle" @click="toggleSidebar">
           <span>☰</span>
         </button>
-        <h1>用户管理系统</h1>
+        <h1>合同管理系统</h1>
       </div>
       <div class="header-right">
         <span class="welcome">欢迎, {{ authStore.user?.name }}</span>
+        <button @click="goHome" class="home-btn">🏠 首页</button>
+        <button @click="goChangePassword" class="home-btn">🔑 修改密码</button>
         <button @click="handleLogout" class="logout-btn">注销</button>
       </div>
     </header>
@@ -83,19 +85,67 @@
 
           <!-- 审批管理（仅 SuperAdmin 显示） -->
           <div v-if="isSuperAdmin" class="menu-group">
-            <router-link to="/contracts/approval" class="menu-item">
-              <span class="menu-icon">✅</span>
-              <span class="menu-text">审批管理</span>
-            </router-link>
+            <div 
+              class="menu-group-header" 
+              @click="toggleMenuGroup('approvalManagement')"
+              :class="{ collapsed: !menuGroups.approvalManagement }"
+            >
+              <span class="group-icon">✅</span>
+              <span class="group-title">审批管理</span>
+              <span class="arrow-icon" :class="{ expanded: menuGroups.approvalManagement }">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+            </div>
+            <transition name="slide-fade">
+              <div v-show="menuGroups.approvalManagement" class="menu-items">
+                <router-link to="/approval/contracts" class="menu-item">
+                  <span class="menu-icon">📋</span>
+                  <span class="menu-text">合同审批</span>
+                </router-link>
+                <router-link to="/approval/amounts" class="menu-item">
+                  <span class="menu-icon">💰</span>
+                  <span class="menu-text">金额审批</span>
+                </router-link>
+                <router-link to="/approval/payments" class="menu-item">
+                  <span class="menu-icon">💳</span>
+                  <span class="menu-text">支付审批</span>
+                </router-link>
+              </div>
+            </transition>
           </div>
 
           <!-- 通知管理（所有角色可见） -->
           <div class="menu-group">
-            <router-link to="/notifications" class="menu-item">
-              <span class="menu-icon">🔔</span>
-              <span class="menu-text">通知管理</span>
+            <div 
+              class="menu-group-header" 
+              @click="toggleMenuGroup('notificationManagement')"
+              :class="{ collapsed: !menuGroups.notificationManagement }"
+            >
+              <span class="group-icon">🔔</span>
+              <span class="group-title">通知管理</span>
               <span v-if="unreadCount > 0" class="badge">{{ unreadCount }}</span>
-            </router-link>
+              <span class="arrow-icon" :class="{ expanded: menuGroups.notificationManagement }">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+            </div>
+            <transition name="slide-fade">
+              <div v-show="menuGroups.notificationManagement" class="menu-items">
+                <router-link to="/notifications/contract" class="menu-item">
+                  <span class="menu-icon">📄</span>
+                  <span class="menu-text">合同消息</span>
+                  <span v-if="contractUnread > 0" class="sub-badge">{{ contractUnread }}</span>
+                </router-link>
+                <router-link to="/notifications/amount" class="menu-item">
+                  <span class="menu-icon">💰</span>
+                  <span class="menu-text">金额消息</span>
+                  <span v-if="amountUnread > 0" class="sub-badge">{{ amountUnread }}</span>
+                </router-link>
+              </div>
+            </transition>
           </div>
         </nav>
       </aside>
@@ -109,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, provide } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api/axios'
@@ -117,7 +167,9 @@ import apiClient from '../api/axios'
 const router = useRouter()
 const authStore = useAuthStore()
 const sidebarCollapsed = ref(false)
-const unreadCount = ref(0)
+const contractUnread = ref(0)
+const amountUnread = ref(0)
+const unreadCount = computed(() => contractUnread.value + amountUnread.value)
 
 const isSuperAdmin = computed(() => {
   const role = authStore.user?.role
@@ -126,21 +178,27 @@ const isSuperAdmin = computed(() => {
 
 async function fetchUnreadCount() {
   try {
-    const res = await apiClient.get('/notifications/unread-count')
-    unreadCount.value = res.data.count
+    const res = await apiClient.get('/notifications/unread-count-by-category')
+    contractUnread.value = res.data.contract || 0
+    amountUnread.value = res.data.amount || 0
   } catch (e) { /* ignore */ }
 }
+
+// 提供刷新函数给子组件
+provide('refreshUnreadCount', fetchUnreadCount)
 
 // 每30秒刷新未读数
 onMounted(() => {
   fetchUnreadCount()
-  setInterval(fetchUnreadCount, 30000)
+  setInterval(fetchUnreadCount, 3600000)
 })
 
 // 菜单组展开状态
 const menuGroups = ref({
-  userManagement: true,      // 默认展开
-  contractManagement: true   // 默认展开
+  userManagement: true,
+  contractManagement: true,
+  approvalManagement: true,
+  notificationManagement: true
 })
 
 function toggleSidebar() {
@@ -149,6 +207,14 @@ function toggleSidebar() {
 
 function toggleMenuGroup(groupName) {
   menuGroups.value[groupName] = !menuGroups.value[groupName]
+}
+
+function goHome() {
+  router.push('/')
+}
+
+function goChangePassword() {
+  router.push('/change-password')
 }
 
 function handleLogout() {
@@ -217,6 +283,7 @@ function handleLogout() {
   font-size: 14px;
 }
 
+.home-btn,
 .logout-btn {
   padding: 8px 16px;
   background: rgba(255, 255, 255, 0.2);
@@ -228,6 +295,7 @@ function handleLogout() {
   font-size: 14px;
 }
 
+.home-btn:hover,
 .logout-btn:hover {
   background: rgba(255, 255, 255, 0.3);
 }
@@ -454,6 +522,20 @@ function handleLogout() {
   min-width: 18px;
   text-align: center;
   line-height: 14px;
+  margin-left: auto;
+}
+
+/* 子菜单未读红点 */
+.sub-badge {
+  background: #e74c3c;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 13px;
   margin-left: auto;
 }
 

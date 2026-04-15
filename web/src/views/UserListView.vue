@@ -12,9 +12,13 @@
         type="text"
         placeholder="🔍 搜索用户名或邮箱..."
         class="search-input"
+        @keyup.enter="handleSearch"
       />
-      <button @click="fetchUsers" class="refresh-btn" :disabled="loading">
-        ↻ 刷新
+      <button @click="handleSearch" class="refresh-btn" :disabled="loading">
+        🔍 搜索
+      </button>
+      <button @click="handleReset" class="refresh-btn" :disabled="loading">
+        🔄 重置
       </button>
     </div>
 
@@ -33,27 +37,33 @@
     <!-- 用户列表 -->
     <div v-if="!loading" class="table-card">
       <div class="table-header">
-        <h3>用户列表 ({{ filteredUsers.length }})</h3>
+        <h3>用户列表 ({{ totalCount }})</h3>
       </div>
       
-      <div v-if="filteredUsers.length" class="table-wrapper">
+      <div v-if="users.length" class="table-wrapper">
         <table>
           <thead>
             <tr>
               <th>ID</th>
               <th>姓名</th>
               <th>邮箱</th>
+              <th>角色</th>
               <th>创建时间</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="user in filteredUsers" :key="user.id">
+            <tr v-for="user in users" :key="user.id">
               <td>{{ user.id }}</td>
               <td>
                 <div class="user-name">{{ user.name }}</div>
               </td>
               <td>{{ user.email }}</td>
+              <td>
+                <span class="role-badge" :class="isUserAdmin(user) ? 'role-admin' : 'role-user'">
+                  {{ isUserAdmin(user) ? '超级管理员' : '普通用户' }}
+                </span>
+              </td>
               <td>{{ formatDate(user.createdAt) }}</td>
               <td>
                 <div class="action-buttons">
@@ -65,9 +75,12 @@
                     ✏️ 编辑
                   </button>
                   <button
+                    v-if="isSuperAdmin"
                     class="btn-delete"
+                    :class="{ 'btn-disabled': isUserAdmin(user) }"
+                    :disabled="isUserAdmin(user)"
                     @click="deleteUser(user.id, user.name)"
-                    title="删除用户"
+                    :title="isUserAdmin(user) ? '不能删除管理员' : '删除用户'"
                   >
                     🗑️ 删除
                   </button>
@@ -85,6 +98,27 @@
           + 添加第一个用户
         </router-link>
       </div>
+
+      <!-- 分页 -->
+      <div v-if="users.length" class="pagination">
+        <span class="pagination-info">共 {{ totalCount }} 条记录，第 {{ currentPage }} / {{ totalPages }} 页</span>
+        <div class="pagination-buttons">
+          <button
+            class="page-btn"
+            :disabled="currentPage <= 1"
+            @click="goToPage(currentPage - 1)"
+          >
+            ◀ 上一页
+          </button>
+          <button
+            class="page-btn"
+            :disabled="currentPage >= totalPages"
+            @click="goToPage(currentPage + 1)"
+          >
+            下一页 ▶
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -92,23 +126,28 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import apiClient from '../api/axios'
 
 const router = useRouter()
+const authStore = useAuthStore()
+
+const isSuperAdmin = computed(() => {
+  const role = authStore.user?.role
+  return role === 0 || role === 'SuperAdmin'
+})
 const users = ref([])
 const loading = ref(false)
 const errorMessage = ref('')
 const searchQuery = ref('')
 
-// 过滤用户列表
-const filteredUsers = computed(() => {
-  if (!searchQuery.value) return users.value
-  
-  const query = searchQuery.value.toLowerCase()
-  return users.value.filter(user => 
-    user.name.toLowerCase().includes(query) || 
-    user.email.toLowerCase().includes(query)
-  )
+// 分页状态
+const currentPage = ref(1)
+const pageSize = ref(10)
+const totalCount = ref(0)
+
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(totalCount.value / pageSize.value))
 })
 
 // 获取用户列表
@@ -117,13 +156,40 @@ async function fetchUsers() {
   errorMessage.value = ''
   
   try {
-    const res = await apiClient.get('/users')
-    users.value = res.data
+    const res = await apiClient.get('/users', {
+      params: {
+        search: searchQuery.value || undefined,
+        page: currentPage.value,
+        pageSize: pageSize.value
+      }
+    })
+    users.value = res.data.items
+    totalCount.value = res.data.total
   } catch (error) {
     errorMessage.value = '获取数据失败: ' + (error.response?.data?.message || error.message)
   } finally {
     loading.value = false
   }
+}
+
+// 搜索
+function handleSearch() {
+  currentPage.value = 1
+  fetchUsers()
+}
+
+// 重置
+function handleReset() {
+  searchQuery.value = ''
+  currentPage.value = 1
+  fetchUsers()
+}
+
+// 翻页
+function goToPage(page) {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  fetchUsers()
 }
 
 // 编辑用户
@@ -141,6 +207,11 @@ async function deleteUser(id, name) {
   } catch (error) {
     errorMessage.value = '删除失败: ' + (error.response?.data?.message || error.message)
   }
+}
+
+// 判断用户是否为管理员
+function isUserAdmin(user) {
+  return user.role === 0 || user.role === 'SuperAdmin'
 }
 
 // 格式化日期
@@ -380,10 +451,40 @@ tbody tr:hover {
   transition: all 0.3s;
 }
 
-.btn-delete:hover {
+.btn-delete:hover:not(:disabled) {
   background: #e74c3c;
   color: white;
   border-color: #e74c3c;
+}
+
+.btn-delete.btn-disabled {
+  background: #f0f0f0;
+  color: #bbb;
+  border-color: #e0e0e0;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 角色标签 */
+.role-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.role-admin {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+.role-user {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
 }
 
 .empty-state {
@@ -418,6 +519,48 @@ tbody tr:hover {
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
+/* 分页 */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.pagination-info {
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.page-btn {
+  padding: 8px 18px;
+  background: #f5f7fa;
+  color: #34495e;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .table-wrapper {
@@ -438,6 +581,12 @@ tbody tr:hover {
   .action-buttons {
     flex-direction: column;
     gap: 4px;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
   }
 }
 </style>

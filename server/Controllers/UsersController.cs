@@ -20,10 +20,30 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        var users = await _db.Users.ToListAsync();
-        return Ok(users);
+        var query = _db.Users.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(u =>
+                u.Name.Contains(search) ||
+                u.Email.Contains(search) ||
+                u.UserName.Contains(search));
+        }
+
+        var total = await query.CountAsync();
+
+        var users = await query
+            .OrderByDescending(u => u.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return Ok(new { items = users, total, page, pageSize });
     }
 
     [HttpGet("{id}")]
@@ -88,22 +108,86 @@ public class UsersController : ControllerBase
         return Ok(existingUser);
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    // ────────── 管理员重置用户密码 ──────────
+    [HttpPut("{id}/reset-password")]
+    public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetPasswordDto dto)
     {
+        // 仅 SuperAdmin 可操作
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var currentUserId))
+            return Unauthorized();
+
+        var currentUser = await _db.Users.FindAsync(currentUserId);
+        if (currentUser == null || currentUser.Role != UserRole.SuperAdmin)
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
+            return BadRequest(new { message = "密码至少需要 6 个字符" });
+
         var user = await _db.Users.FindAsync(id);
         if (user is null) return NotFound();
 
-        // 获取当前用户ID
+        var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+        user.PasswordHash = hasher.HashPassword(user, dto.NewPassword);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "密码重置成功" });
+    }
+
+    public class ResetPasswordDto
+    {
+        public string NewPassword { get; set; } = string.Empty;
+    }
+
+    // ────────── 用户修改自己密码 ──────────
+    [HttpPut("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var currentUserId))
-        {
-            // SuperAdmin 不能删除自己
-            if (currentUserId == id && user.Role == UserRole.SuperAdmin)
-            {
-                return BadRequest(new { message = "超级管理员无法删除自己" });
-            }
-        }
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var currentUserId))
+            return Unauthorized();
+
+        var user = await _db.Users.FindAsync(currentUserId);
+        if (user == null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
+            return BadRequest(new { message = "新密码至少需要 6 个字符" });
+
+        var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+        var result = hasher.VerifyHashedPassword(user, user.PasswordHash, dto.OldPassword);
+        if (result == Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed)
+            return BadRequest(new { message = "旧密码不正确" });
+
+        user.PasswordHash = hasher.HashPassword(user, dto.NewPassword);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "密码修改成功" });
+    }
+
+    public class ChangePasswordDto
+    {
+        public string OldPassword { get; set; } = string.Empty;
+        public string NewPassword { get; set; } = string.Empty;
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        // 仅管理员可删除用户
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var currentUserId))
+            return Unauthorized();
+
+        var currentUser = await _db.Users.FindAsync(currentUserId);
+        if (currentUser == null || currentUser.Role != UserRole.SuperAdmin)
+            return Forbid();
+
+        var user = await _db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+
+        // SuperAdmin 不能删除自己
+        if (currentUserId == id)
+            return BadRequest(new { message = "超级管理员无法删除自己" });
 
         _db.Users.Remove(user);
         await _db.SaveChangesAsync();

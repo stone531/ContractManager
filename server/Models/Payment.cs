@@ -3,6 +3,13 @@ using System.Text.Json.Serialization;
 
 namespace server.Models;
 
+public enum PaymentStatus
+{
+    Pending = 0,
+    Approved = 1,
+    Rejected = 2
+}
+
 public class Payment
 {
     public int Id { get; set; }
@@ -23,10 +30,15 @@ public class Payment
     [StringLength(500)]
     public string? Note { get; set; }
 
+    // 审批状态
+    public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
+
+    // 提交者用户ID
+    public int? CreatedBy { get; set; }
+
     // 创建时间
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [JsonIgnore]
-    // 关联的合�?
     public Contract Contract { get; set; } = null!;
 }

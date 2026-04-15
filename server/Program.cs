@@ -68,6 +68,7 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
     app.UseSwaggerUI();
 }
@@ -80,6 +81,9 @@ using (var scope = app.Services.CreateScope())
     // 若数据库不存在则创建（会根据当前模型建表）
     db.Database.EnsureCreated();
 
+    // 补全已有数据库中缺失的列和表（兼容旧版 app.db）
+    EnsureSchema(db);
+
     SeedInitialData(db);
 }
 
@@ -88,6 +92,66 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
+
+static void EnsureSchema(AppDbContext db)
+{
+    var conn = db.Database.GetDbConnection();
+    conn.Open();
+    using var cmd = conn.CreateCommand();
+
+    void TryExec(string sql) { try { cmd.CommandText = sql; cmd.ExecuteNonQuery(); } catch { } }
+
+    // Contracts 表补列
+    TryExec("ALTER TABLE Contracts ADD COLUMN ContractNumber TEXT");
+    TryExec("ALTER TABLE Contracts ADD COLUMN ApprovalStatus INTEGER NOT NULL DEFAULT 0");
+    TryExec("ALTER TABLE Contracts ADD COLUMN ContractStatus INTEGER NOT NULL DEFAULT 0");
+    TryExec("ALTER TABLE Contracts ADD COLUMN SubmittedAmount REAL NOT NULL DEFAULT 0");
+    TryExec("ALTER TABLE Contracts ADD COLUMN SubmittedBy INTEGER");
+    TryExec("ALTER TABLE Contracts ADD COLUMN ApprovedAt TEXT");
+    TryExec("ALTER TABLE Contracts ADD COLUMN CreatedBy INTEGER");
+    TryExec("ALTER TABLE Contracts ADD COLUMN StartDate TEXT");
+    TryExec("ALTER TABLE Contracts ADD COLUMN EndDate TEXT");
+    TryExec("ALTER TABLE Contracts ADD COLUMN TerminatedAt TEXT");
+    TryExec("ALTER TABLE Contracts ADD COLUMN TerminatedBy INTEGER");
+
+    // Payments 表补列
+    TryExec("ALTER TABLE Payments ADD COLUMN Status INTEGER NOT NULL DEFAULT 0");
+    TryExec("ALTER TABLE Payments ADD COLUMN CreatedBy INTEGER");
+    TryExec("ALTER TABLE Payments ADD COLUMN CreatedAt TEXT NOT NULL DEFAULT '2024-01-01T00:00:00'");
+
+    // Users 表补列
+    TryExec("ALTER TABLE Users ADD COLUMN UserName TEXT NOT NULL DEFAULT ''");
+    TryExec("ALTER TABLE Users ADD COLUMN Role INTEGER NOT NULL DEFAULT 2");
+    TryExec("ALTER TABLE Users ADD COLUMN IsEnabled INTEGER NOT NULL DEFAULT 1");
+
+    // Notifications 表（新表）
+    cmd.CommandText = @"CREATE TABLE IF NOT EXISTS Notifications (
+        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+        Type INTEGER NOT NULL,
+        Message TEXT NOT NULL,
+        ContractId INTEGER,
+        FromUserId INTEGER NOT NULL DEFAULT 0,
+        ToUserId INTEGER NOT NULL DEFAULT 0,
+        IsRead INTEGER NOT NULL DEFAULT 0,
+        RejectReason TEXT,
+        CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )";
+    cmd.ExecuteNonQuery();
+
+    // AuditLogs 表（新表）
+    cmd.CommandText = @"CREATE TABLE IF NOT EXISTS AuditLogs (
+        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ContractId INTEGER,
+        UserId INTEGER NOT NULL DEFAULT 0,
+        UserName TEXT NOT NULL DEFAULT '',
+        Action TEXT NOT NULL DEFAULT '',
+        Description TEXT NOT NULL DEFAULT '',
+        CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )";
+    cmd.ExecuteNonQuery();
+
+    conn.Close();
+}
 
 static void SeedInitialData(AppDbContext db)
 {
@@ -114,23 +178,38 @@ static void SeedInitialData(AppDbContext db)
 
     if (!db.Contracts.Any())
     {
+        var adminUser = db.Users.FirstOrDefault(u => u.Role == UserRole.SuperAdmin);
+        var adminId = adminUser?.Id;
+
         var c1 = new Contract
         {
+            ContractNumber = "HT260413001",
             Name = "办公设备采购合同",
             Description = "用于公司办公设备采购",
             TotalAmount = 120000,
             OriginalAmount = 120000,
             PaidAmount = 20000,
+            CreatedBy = adminId,
+            ApprovalStatus = ApprovalStatus.Approved,
+            ContractStatus = ContractStatus.InProgress,
+            StartDate = DateTime.UtcNow.AddDays(-30),
+            EndDate = DateTime.UtcNow.AddDays(335),
             CreatedAt = DateTime.UtcNow
         };
 
         var c2 = new Contract
         {
+            ContractNumber = "HT260413002",
             Name = "软件开发服务合同",
             Description = "外包开发项目",
             TotalAmount = 300000,
             OriginalAmount = 300000,
             PaidAmount = 0,
+            CreatedBy = adminId,
+            ApprovalStatus = ApprovalStatus.Approved,
+            ContractStatus = ContractStatus.InProgress,
+            StartDate = DateTime.UtcNow.AddDays(-10),
+            EndDate = DateTime.UtcNow.AddDays(170),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -149,6 +228,7 @@ static void SeedInitialData(AppDbContext db)
                 Amount = 20000,
                 PaymentDate = DateTime.UtcNow,
                 Note = "首付款",
+                Status = PaymentStatus.Approved,
                 CreatedAt = DateTime.UtcNow
             });
 

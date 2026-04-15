@@ -21,6 +21,16 @@
         </div>
 
         <div class="form-group">
+          <label for="contractNumber">合同编号</label>
+          <input
+            id="contractNumber"
+            v-model="form.contractNumber"
+            type="text"
+            placeholder="请输入合同编号（选填）"
+          />
+        </div>
+
+        <div class="form-group">
           <label for="description">合同描述</label>
           <textarea
             id="description"
@@ -43,6 +53,17 @@
               placeholder="0.00"
               required
             />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="startDate">合同生效日期</label>
+            <input id="startDate" v-model="form.startDate" type="date" />
+          </div>
+          <div class="form-group">
+            <label for="endDate">合同到期日期</label>
+            <input id="endDate" v-model="form.endDate" type="date" />
           </div>
         </div>
 
@@ -101,8 +122,11 @@ const fileInput = ref(null)
 
 const form = ref({
   name: '',
+  contractNumber: '',
   description: '',
-  totalAmount: 0
+  totalAmount: 0,
+  startDate: '',
+  endDate: ''
 })
 
 const selectedFile = ref(null)
@@ -140,8 +164,11 @@ async function handleSubmit() {
   try {
     const formData = new FormData()
     formData.append('name', form.value.name)
+    if (form.value.contractNumber) formData.append('contractNumber', form.value.contractNumber)
     formData.append('description', form.value.description || '')
     formData.append('totalAmount', form.value.totalAmount)
+    if (form.value.startDate) formData.append('startDate', form.value.startDate)
+    if (form.value.endDate) formData.append('endDate', form.value.endDate)
     
     if (selectedFile.value) {
       formData.append('file', selectedFile.value)
@@ -168,8 +195,11 @@ async function handleSubmit() {
 function handleReset() {
   form.value = {
     name: '',
+    contractNumber: '',
     description: '',
-    totalAmount: 0
+    totalAmount: 0,
+    startDate: '',
+    endDate: ''
   }
   clearFile()
   error.value = null
@@ -280,6 +310,26 @@ function handleReset() {
 }
 
 .amount-input input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-row .form-group input[type="date"] {
+  padding: 12px 16px;
+  border: 2px solid #ecf0f1;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+  width: 100%;
+}
+
+.form-row .form-group input[type="date"]:focus {
   outline: none;
   border-color: #667eea;
 }

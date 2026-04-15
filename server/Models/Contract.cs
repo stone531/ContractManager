@@ -13,7 +13,8 @@ public enum ContractStatus
 {
     Initial = 0,       // 初始状态
     InProgress = 1,    // 进行中
-    Completed = 2      // 已完成
+    Completed = 2,     // 已完成
+    Terminated = 3     // 已终止
 }
 
 public class Contract
@@ -78,6 +79,18 @@ public class Contract
 
     // 创建者用户ID
     public int? CreatedBy { get; set; }
+
+    // 合同生效日期
+    public DateTime? StartDate { get; set; }
+
+    // 合同到期日期
+    public DateTime? EndDate { get; set; }
+
+    // 终止时间
+    public DateTime? TerminatedAt { get; set; }
+
+    // 终止操作者用户ID
+    public int? TerminatedBy { get; set; }
 
     // 支付记录
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
