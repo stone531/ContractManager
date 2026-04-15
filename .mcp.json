@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "C:/Users/Administrator/AppData/Local/Programs/Python/Python312/Scripts/mcp-server-sqlite.exe",
+      "args": [
+        "--db-path",
+        "D:/code/dotnet/ContractManager/server/app.db"
+      ]
+    }
+  }
+}
