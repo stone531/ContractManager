@@ -35,7 +35,7 @@ public class ContractsController : ControllerBase
         var uid = GetCurrentUserId();
         if (!uid.HasValue) return (0, "Unknown", false);
         var user = await _db.Users.FindAsync(uid.Value);
-        return (uid.Value, user?.Name ?? "Unknown", user?.Role == UserRole.SuperAdmin);
+        return (uid.Value, user?.Name ?? "Unknown", user?.Role is UserRole.SuperAdmin or UserRole.Admin);
     }
 
     private void AddAuditLog(int? contractId, int userId, string userName, string action, string description)
@@ -197,7 +197,7 @@ public class ContractsController : ControllerBase
 
         if (!isSuperAdmin)
         {
-            var superAdmins = await _db.Users.Where(u => u.Role == UserRole.SuperAdmin).ToListAsync();
+            var superAdmins = await _db.Users.Where(u => u.Role == UserRole.SuperAdmin || u.Role == UserRole.Admin).ToListAsync();
             foreach (var admin in superAdmins)
             {
                 _db.Notifications.Add(new Notification
@@ -321,6 +321,8 @@ public class ContractsController : ControllerBase
         var (userId, userName, _) = await GetCurrentUserInfo();
         var contract = await _db.Contracts.FindAsync(id);
         if (contract == null) return NotFound();
+        if (contract.ApprovalStatus != ApprovalStatus.Pending)
+            return BadRequest("该合同已被其他管理员处理");
 
         contract.ApprovalStatus = ApprovalStatus.Approved;
         contract.ContractStatus = ContractStatus.InProgress;
@@ -352,6 +354,8 @@ public class ContractsController : ControllerBase
         var (userId, userName, _) = await GetCurrentUserInfo();
         var contract = await _db.Contracts.FindAsync(id);
         if (contract == null) return NotFound();
+        if (contract.ApprovalStatus != ApprovalStatus.Pending)
+            return BadRequest("该合同已被其他管理员处理");
 
         contract.ApprovalStatus = ApprovalStatus.Rejected;
         contract.UpdatedAt = DateTime.UtcNow;
@@ -394,7 +398,7 @@ public class ContractsController : ControllerBase
         AddAuditLog(contract.Id, userId, userName, "AmountSubmitted",
             $"提交金额变更 ¥{dto.Amount:F2}（原 ¥{contract.TotalAmount:F2}）");
 
-        var superAdmins = await _db.Users.Where(u => u.Role == UserRole.SuperAdmin).ToListAsync();
+        var superAdmins = await _db.Users.Where(u => u.Role == UserRole.SuperAdmin || u.Role == UserRole.Admin).ToListAsync();
         foreach (var admin in superAdmins)
         {
             _db.Notifications.Add(new Notification
@@ -426,6 +430,8 @@ public class ContractsController : ControllerBase
         var (userId, userName, _) = await GetCurrentUserInfo();
         var contract = await _db.Contracts.FindAsync(id);
         if (contract == null) return NotFound();
+        if (contract.SubmittedAmount == 0 || contract.SubmittedBy == null)
+            return BadRequest("该金额变更已被其他管理员处理");
 
         var oldAmount = contract.TotalAmount;
         contract.TotalAmount = contract.SubmittedAmount;
@@ -459,6 +465,8 @@ public class ContractsController : ControllerBase
         var (userId, userName, _) = await GetCurrentUserInfo();
         var contract = await _db.Contracts.FindAsync(id);
         if (contract == null) return NotFound();
+        if (contract.SubmittedAmount == 0 || contract.SubmittedBy == null)
+            return BadRequest("该金额变更已被其他管理员处理");
 
         var submittedBy = contract.SubmittedBy;
         contract.SubmittedAmount = 0;
@@ -524,7 +532,7 @@ public class ContractsController : ControllerBase
             AddAuditLog(contract.Id, userId, userName, "PaymentAdded",
                 $"提交支付 ¥{dto.Amount:F2}，等待审批");
 
-            var superAdmins = await _db.Users.Where(u => u.Role == UserRole.SuperAdmin).ToListAsync();
+            var superAdmins = await _db.Users.Where(u => u.Role == UserRole.SuperAdmin || u.Role == UserRole.Admin).ToListAsync();
             foreach (var admin in superAdmins)
             {
                 _db.Notifications.Add(new Notification

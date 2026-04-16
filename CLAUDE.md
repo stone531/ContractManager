@@ -44,8 +44,9 @@ cd web && npm run build
 
 ### Backend
 
-- **`server/Program.cs`** — Bootstraps DI: SQLite DbContext, JWT Bearer auth, CORS for Vue dev server (`http://localhost:5173`), Swagger, controllers. Runs `EnsureCreated()` + raw SQL fallback DDL to handle schema gaps, and seeds demo users/contracts on first run.
-- **`server/Data/AppDbContext.cs`** — EF Core DbContext backed by `app.db` (SQLite, in the working directory). Contains `DbSet`s for `Contracts`, `Payments`, `Users`, `Notifications`, `AuditLogs`.
+- **`server/Program.cs`** — Bootstraps DI: DbContext (SQLite or MySQL), JWT Bearer auth, CORS for Vue dev server (`http://localhost:5173`), Swagger, controllers. On startup runs `EnsureCreated()` then delegates to `DatabaseInitializerFactory` → `SqliteInitializer` or `MySqlInitializer` to ensure schema gaps, then `DatabaseSeeder` to seed demo data on first run.
+- **`server/Data/AppDbContext.cs`** — EF Core DbContext. Contains `DbSet`s for `Contracts`, `Payments`, `Users`, `Notifications`, `AuditLogs`.
+- **`server/Data/DatabaseInitializerFactory.cs`** — Selects `SqliteInitializer` or `MySqlInitializer` based on `Database:DbType` config (`1` = SQLite default, `2` = MySQL). Each initializer ensures missing columns exist and calls `DatabaseSeeder.Seed(db)`.
 - **`server/Models/`** — Core entities and enums (see Domain Concepts below). DTOs under `Models/DTOs/`.
 - **`server/Controllers/`** — `AuthController`, `ContractsController`, `UsersController`, `NotificationsController`.
 - **`server/Services/TokenService.cs`** — Generates JWT tokens; config from `appsettings.json` under `Jwt:Key/Issuer/Audience/ExpirationMinutes`.
@@ -104,4 +105,10 @@ All `/api/*` requests from the frontend dev server are proxied to `http://localh
 
 ### Demo Seed Accounts
 
-On first run, three accounts are seeded: `zhangsan@example.com`, `lisi@example.com`, `wangwu@example.com` — all with password `password123`. The first seeded user is SuperAdmin.
+On first run, two accounts are seeded:
+- `admin` / `admin` — SuperAdmin
+- `test` / `test123` — User
+
+### Database Configuration
+
+Configured in `server/appsettings.json` under `Database:DbType`: `1` = SQLite (default, `app.db` in working directory), `2` = MySQL (connection params under `Database:MySQL:*`).

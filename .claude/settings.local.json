@@ -15,5 +15,9 @@
       "Bash(pip show:*)",
       "Bash(dotnet build:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "sqlite"
+  ],
+  "enableAllProjectMcpServers": true
 }

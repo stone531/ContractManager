@@ -113,8 +113,8 @@ public class UsersController : ControllerBase
         existingUser.Name = dto.Name;
         existingUser.Email = dto.Email;
 
-        // 角色修改（仅 SuperAdmin 可操作，且不允许修改自己的角色）
-        if (dto.Role.HasValue && currentUser?.Role == UserRole.SuperAdmin && existingUser.Id != currentUserId)
+        // 角色修改（仅管理员可操作，且不允许修改自己的角色）
+        if (dto.Role.HasValue && currentUser?.Role is UserRole.SuperAdmin or UserRole.Admin && existingUser.Id != currentUserId)
         {
             if (dto.Role.Value != UserRole.SuperAdmin) // 不允许将其他用户提升为 SuperAdmin
             {
@@ -141,7 +141,7 @@ public class UsersController : ControllerBase
         if (!currentUserId.HasValue) return Unauthorized();
 
         var currentUser = await _db.Users.FindAsync(currentUserId.Value);
-        if (currentUser == null || currentUser.Role != UserRole.SuperAdmin)
+        if (currentUser == null || currentUser.Role is not (UserRole.SuperAdmin or UserRole.Admin))
             return Forbid();
 
         var user = await _db.Users.FindAsync(id);
@@ -167,7 +167,7 @@ public class UsersController : ControllerBase
             return Unauthorized();
 
         var currentUser = await _db.Users.FindAsync(currentUserId);
-        if (currentUser == null || currentUser.Role != UserRole.SuperAdmin)
+        if (currentUser == null || currentUser.Role is not (UserRole.SuperAdmin or UserRole.Admin))
             return Forbid();
 
         if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
@@ -228,15 +228,15 @@ public class UsersController : ControllerBase
             return Unauthorized();
 
         var currentUser = await _db.Users.FindAsync(currentUserId);
-        if (currentUser == null || currentUser.Role != UserRole.SuperAdmin)
+        if (currentUser == null || currentUser.Role is not (UserRole.SuperAdmin or UserRole.Admin))
             return Forbid();
 
         var user = await _db.Users.FindAsync(id);
         if (user is null) return NotFound();
 
-        // SuperAdmin 不能删除自己
+        // 管理员不能删除自己
         if (currentUserId == id)
-            return BadRequest(new { message = "超级管理员无法删除自己" });
+            return BadRequest(new { message = "管理员无法删除自己" });
 
         _db.Users.Remove(user);
         await _db.SaveChangesAsync();

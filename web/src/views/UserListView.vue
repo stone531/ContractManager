@@ -149,7 +149,7 @@ const authStore = useAuthStore()
 
 const isSuperAdmin = computed(() => {
   const role = authStore.user?.role
-  return role === 0 || role === 'SuperAdmin'
+  return role === 0 || role === 1
 })
 const users = ref([])
 const loading = ref(false)
@@ -239,18 +239,17 @@ async function toggleEnable(id, name, currentEnabled) {
 
 // 判断用户是否为管理员
 function isUserAdmin(user) {
-  return user.role === 0 || user.role === 'SuperAdmin'
+  return user.role === 0 || user.role === 1
 }
 
 // 角色显示
 function getRoleLabel(role) {
-  const map = { 0: '超级管理员', 1: '管理员', 2: '普通用户' }
+  const map = { 0: '管理员', 1: '管理员', 2: '普通用户' }
   return map[role] ?? '普通用户'
 }
 
 function getRoleClass(role) {
-  if (role === 0) return 'role-admin'
-  if (role === 1) return 'role-manager'
+  if (role === 0 || role === 1) return 'role-admin'
   return 'role-user'
 }
 

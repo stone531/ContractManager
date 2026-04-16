@@ -132,7 +132,7 @@ import { useAuthStore } from '../stores/auth'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const isSuperAdmin = computed(() => { const r = authStore.user?.role; return r === 0 || r === 'SuperAdmin' })
+const isSuperAdmin = computed(() => { const r = authStore.user?.role; return r === 0 || r === 1 })
 
 const contract = ref(null)
 const payments = ref([])

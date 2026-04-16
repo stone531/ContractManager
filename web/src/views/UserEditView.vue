@@ -136,7 +136,7 @@ const userId = ref(route.params.id)
 
 const isSuperAdmin = computed(() => {
   const role = authStore.user?.role
-  return role === 0 || role === 'SuperAdmin'
+  return role === 0 || role === 1
 })
 
 const isEditingSuperAdmin = computed(() => {

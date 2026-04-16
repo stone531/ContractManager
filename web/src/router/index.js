@@ -139,7 +139,7 @@ router.beforeEach((to, from, next) => {
     next('/')
   } else if (to.meta.requiresSuperAdmin) {
     const role = authStore.user?.role
-    if (role === 0 || role === 'SuperAdmin') {
+    if (role === 0 || role === 1) {
       next()
     } else {
       next('/')
